@@ -10,8 +10,13 @@ Build:
 Run:  
  `build\release\bin\chatterbox_tts_demo.exe -m models\onnx --download -t "Hello, my friend! If you seek knowledge about mighty Talos, you have most certainly come to the right person." -v assets\malebrute.wav -o test_q4.wav --dtype q4`  
 
+
+Cache conditionals from wav files found in "assets" folder to disk ("cache" folder):  
+`build\release\bin\chatterbox_tts_demo.exe --precache`
+
 Add some tags:  
- `build\release\bin\chatterbox_tts_demo.exe -m models\onnx -t "[clear throat] Listen up worm! [sniff] Did you just soil yourself? [cough] Well, I was just going to [chuckle] disembowel you anyway. So, like, whatever [laugh]!" -v assets\babette.wav -o test_q4.wav --dtype q4`  
+ `build\release\bin\chatterbox_tts_demo.exe -m models\onnx -t"[clear throat] Listen up worm! [sniff] ugh! Did you just [groan] soil yourself? [cough] Well, [sigh] I was just going to disembowel you anyway. So, like, [laugh] whatever!"  -v babette
+ -o test_q4.wav --dtype q4`  
 
 Notes:
 - ONNX runtime threads are being set to CPU cores / 4  with a minimum of 2

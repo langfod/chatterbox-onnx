@@ -18,15 +18,21 @@
 #include <filesystem>
 #include <chrono>
 #include <optional>
+#include <algorithm>
 
 #include "tts/ChatterboxTTS.h"
 #include "tts/Tokenizer.h"
 #include "tts/WavWriter.h"
 #include "tts/ModelDownloader.h"
+#include "tts/VoiceConditionalsCache.h"
 
 #include <spdlog/spdlog.h>
 
 namespace fs = std::filesystem;
+
+// Hardcoded cache directory
+constexpr const char* CACHE_DIR = "cache";
+constexpr const char* ASSETS_DIR = "assets";
 
 /**
  * @brief Print usage information
@@ -37,22 +43,27 @@ void PrintUsage(const char* programName) {
               << "Usage: " << programName << " [options]\n\n"
               << "Required (one of):\n"
               << "  -t, --text <text>       Text to synthesize (direct input)\n"
-              << "  -f, --file <path>       Path to .tokens file (pre-tokenized)\n\n"
+              << "  -f, --file <path>       Path to .tokens file (pre-tokenized)\n"
+              << "  --precache              Pre-cache all voices in assets folder\n\n"
               << "Options:\n"
-              << "  -v, --voice <path>      Path to voice reference WAV/XWM file\n"
-              << "                          (default: assets\\dlc1seranavoice.wav)\n"
+              << "  -v, --voice <name>      Voice name or path to WAV file\n"
+              << "                          (e.g., 'malebrute' or 'assets/malebrute.wav')\n"
+              << "                          (default: femaleelfhaughty)\n"
               << "  -o, --output <path>     Output WAV file path (default: output.wav)\n"
               << "  -m, --models <dir>      Models directory (default: models/)\n"
               << "  --dtype <type>          Model dtype: fp32, q8, q4 (default: q4)\n"
               << "  --download              Download models if not present\n"
+              << "  --clearcache            Clear voice conditionals cache before running\n"
               << "  -h, --help              Show this help message\n\n"
               << "Examples:\n"
               << "  # Direct text input (uses HuggingFace tokenizer)\n"
               << "  " << programName << " -t \"Hello, how are you today?\"\n\n"
-              << "  # With custom voice and output\n"
-              << "  " << programName << " -t \"Hello world\" -v my_voice.wav -o speech.wav\n\n"
-              << "  # Using pre-tokenized file\n"
-              << "  " << programName << " -f input.tokens\n";
+              << "  # With custom voice (by name, uses cache)\n"
+              << "  " << programName << " -t \"Hello world\" -v malebrute -o speech.wav\n\n"
+              << "  # Pre-cache all voices in assets folder\n"
+              << "  " << programName << " --precache\n\n"
+              << "  # Clear cache and regenerate\n"
+              << "  " << programName << " --clearcache --precache\n";
 }
 
 /**
@@ -61,13 +72,15 @@ void PrintUsage(const char* programName) {
 struct Config {
     std::string inputText;                                 // Direct text input
     std::string tokensPath;                               // Path to .tokens file (alternative)
-    std::string voicePath = "assets\\femaleelfhaughty.wav"; // Voice reference audio
+    std::string voicePath = "femaleelfhaughty";           // Voice name or path
     std::string outputPath = "output.wav";                 // Output WAV file
     std::string modelsDir = "models";                      // ONNX models directory
     std::string dtype = "q4";                              // Model quantization type
     bool downloadModels = false;                           // Download models if missing
     bool showHelp = false;                                 // Show help and exit
     bool enableProfiling = false;                          // Enable ONNX profiling
+    bool precache = false;                                 // Pre-cache all voices
+    bool clearCache = false;                               // Clear cache before running
 };
 
 /**
@@ -133,6 +146,12 @@ std::optional<Config> ParseArgs(int argc, char* argv[]) {
         else if (arg == "--profile") {
             config.enableProfiling = true;
         }
+        else if (arg == "--precache") {
+            config.precache = true;
+        }
+        else if (arg == "--clearcache") {
+            config.clearCache = true;
+        }
         else if (arg == "-h" || arg == "--help") {
             config.showHelp = true;
         }
@@ -149,9 +168,19 @@ std::optional<Config> ParseArgs(int argc, char* argv[]) {
  * @brief Validate configuration and check file existence
  */
 bool ValidateConfig(const Config& config) {
+    // Precache mode doesn't need text input
+    if (config.precache) {
+        // Just need models directory
+        if (!fs::exists(config.modelsDir) && !config.downloadModels) {
+            std::cerr << "Error: Models directory not found: " << config.modelsDir << "\n";
+            return false;
+        }
+        return true;
+    }
+    
     // Check that at least one input method is provided
     if (config.inputText.empty() && config.tokensPath.empty()) {
-        std::cerr << "Error: Either -t (text) or -f (tokens file) is required.\n";
+        std::cerr << "Error: Either -t (text), -f (tokens file), or --precache is required.\n";
         return false;
     }
     
@@ -161,11 +190,7 @@ bool ValidateConfig(const Config& config) {
         return false;
     }
     
-    // Check voice file exists
-    if (!fs::exists(config.voicePath)) {
-        std::cerr << "Error: Voice file not found: " << config.voicePath << "\n";
-        return false;
-    }
+    // Voice path is validated later (may be cache key or file path)
     
     // Check models directory (warn if missing, allow --download to fix)
     if (!fs::exists(config.modelsDir)) {
@@ -179,18 +204,160 @@ bool ValidateConfig(const Config& config) {
         }
     }
     
-    // If using direct text, check that tokenizer.json exists in models dir
-    if (!config.inputText.empty()) {
-        std::string tokenizerPath = config.modelsDir + "/tokenizer.json";
-        // Also check in onnx_fp32, onnx_q8, onnx_q4 subdirs
-        if (!fs::exists(tokenizerPath)) {
-            tokenizerPath = config.modelsDir + "/onnx_" + config.dtype + "/tokenizer.json";
-        }
-        if (!fs::exists(tokenizerPath)) {
-            std::cerr << "Warning: tokenizer.json not found. Direct text input may not work.\n";
-            std::cerr << "Expected at: " << config.modelsDir << "/tokenizer.json\n";
+    return true;
+}
+
+/**
+ * @brief Pre-cache all voice files in assets directory
+ */
+int RunPrecache(ChatterboxTTS::ChatterboxTTS& tts, ChatterboxTTS::VoiceConditionalsCache& cache, bool clearFirst) {
+    std::cout << "\n=== Pre-caching Voice Conditionals ===\n\n";
+    
+    // Clear cache if requested
+    if (clearFirst) {
+        std::cout << "Clearing existing cache...\n";
+        cache.Clear();
+    }
+    
+    // Find all .wav files in assets folder
+    if (!fs::exists(ASSETS_DIR)) {
+        std::cerr << "Assets directory not found: " << ASSETS_DIR << "\n";
+        return 1;
+    }
+    
+    std::vector<fs::path> wavFiles;
+    for (const auto& entry : fs::directory_iterator(ASSETS_DIR)) {
+        if (entry.is_regular_file()) {
+            auto ext = entry.path().extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            if (ext == ".wav" || ext == ".xwm") {
+                wavFiles.push_back(entry.path());
+            }
         }
     }
+    
+    if (wavFiles.empty()) {
+        std::cout << "No .wav or .xwm files found in " << ASSETS_DIR << "\n";
+        return 0;
+    }
+    
+    std::cout << "Found " << wavFiles.size() << " voice files to process\n\n";
+    
+    int processed = 0;
+    int skipped = 0;
+    int failed = 0;
+    
+    for (const auto& wavPath : wavFiles) {
+        std::string key = ChatterboxTTS::VoiceConditionalsCache::ExtractKey(wavPath.string());
+        std::cout << "Processing: " << key << " (" << wavPath.filename().string() << ")...\n";
+        
+        // Check if already in memory cache
+        if (cache.Has(key)) {
+            std::cout << "  -> Already in memory cache, skipping\n";
+            skipped++;
+            continue;
+        }
+        
+        // Check if exists on disk (and not --clearcache)
+        if (!clearFirst && cache.ExistsOnDisk(key)) {
+            if (cache.LoadFromDisk(key)) {
+                std::cout << "  -> Loaded from disk cache\n";
+                skipped++;
+                continue;
+            }
+        }
+        
+        // Need to generate conditionals
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        if (!tts.PrepareConditionals(wavPath.string())) {
+            std::cerr << "  -> FAILED: " << tts.GetLastError() << "\n";
+            failed++;
+            continue;
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        // Save to cache (memory + disk)
+        if (cache.Put(key, tts.GetConditionals())) {
+            std::cout << "  -> Cached in " << duration.count() << "ms\n";
+            processed++;
+        } else {
+            std::cerr << "  -> Failed to cache\n";
+            failed++;
+        }
+    }
+    
+    std::cout << "\n=== Pre-cache Summary ===\n";
+    std::cout << "  Processed: " << processed << "\n";
+    std::cout << "  Skipped:   " << skipped << " (already cached)\n";
+    std::cout << "  Failed:    " << failed << "\n";
+    std::cout << "  Total cached: " << cache.Size() << " voices\n";
+    
+    return (failed > 0) ? 1 : 0;
+}
+
+/**
+ * @brief Resolve voice path to conditionals (from cache or file)
+ */
+bool ResolveVoice(const std::string& voicePath, 
+                  ChatterboxTTS::ChatterboxTTS& tts,
+                  ChatterboxTTS::VoiceConditionalsCache& cache) {
+    
+    std::string key = ChatterboxTTS::VoiceConditionalsCache::ExtractKey(voicePath);
+    
+    // 1. Check memory cache
+    const auto* cachedConds = cache.Get(key);
+    if (cachedConds) {
+        std::cout << "Using cached voice conditionals: " << key << "\n";
+        tts.SetConditionals(*cachedConds);
+        return true;
+    }
+    
+    // 2. Check disk cache
+    if (cache.ExistsOnDisk(key)) {
+        if (cache.LoadFromDisk(key)) {
+            cachedConds = cache.Get(key);
+            if (cachedConds) {
+                std::cout << "Loaded voice conditionals from disk cache: " << key << "\n";
+                tts.SetConditionals(*cachedConds);
+                return true;
+            }
+        }
+    }
+    
+    // 3. Try to find and process the voice file
+    std::string actualPath;
+    
+    // If voicePath looks like a file path
+    if (fs::exists(voicePath)) {
+        actualPath = voicePath;
+    } else {
+        // Try to find in assets folder
+        for (const auto& ext : {".wav", ".xwm"}) {
+            std::string tryPath = std::string(ASSETS_DIR) + "/" + key + ext;
+            if (fs::exists(tryPath)) {
+                actualPath = tryPath;
+                break;
+            }
+        }
+    }
+    
+    if (actualPath.empty()) {
+        std::cerr << "Error: Voice not found in cache and no matching file found for: " << voicePath << "\n";
+        std::cerr << "  Looked for: " << key << ".wav/.xwm in " << ASSETS_DIR << "/\n";
+        return false;
+    }
+    
+    // Process the voice file
+    std::cout << "Processing voice file: " << actualPath << "\n";
+    if (!tts.PrepareConditionals(actualPath)) {
+        return false;
+    }
+    
+    // Cache for future use
+    cache.Put(key, tts.GetConditionals());
     
     return true;
 }
@@ -217,9 +384,9 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     
-    // Check required arguments
-    if (config.inputText.empty() && config.tokensPath.empty()) {
-        std::cerr << "Error: Either text (-t) or tokens file (-f) is required.\n\n";
+    // Check required arguments (precache mode doesn't need text)
+    if (!config.precache && config.inputText.empty() && config.tokensPath.empty()) {
+        std::cerr << "Error: Either text (-t), tokens file (-f), or --precache is required.\n\n";
         PrintUsage(argv[0]);
         return 1;
     }
@@ -229,17 +396,33 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
+    // Initialize voice cache
+    ChatterboxTTS::VoiceConditionalsCache voiceCache(CACHE_DIR);
+    
+    // Handle --clearcache without precache (just clear and exit)
+    if (config.clearCache && !config.precache && config.inputText.empty() && config.tokensPath.empty()) {
+        std::cout << "Clearing voice conditionals cache...\n";
+        voiceCache.Clear();
+        std::cout << "Cache cleared.\n";
+        return 0;
+    }
+    
     // Print configuration
     std::cout << "Configuration:\n";
-    if (!config.inputText.empty()) {
+    if (config.precache) {
+        std::cout << "  Mode:         Pre-cache voices\n";
+    } else if (!config.inputText.empty()) {
         std::cout << "  Input text:   \"" << config.inputText << "\"\n";
     } else {
         std::cout << "  Tokens file:  " << config.tokensPath << "\n";
     }
-    std::cout << "  Voice file:   " << config.voicePath << "\n";
-    std::cout << "  Output file:  " << config.outputPath << "\n";
+    if (!config.precache) {
+        std::cout << "  Voice:        " << config.voicePath << "\n";
+        std::cout << "  Output file:  " << config.outputPath << "\n";
+    }
     std::cout << "  Models dir:   " << config.modelsDir << "\n";
     std::cout << "  Model dtype:  " << config.dtype << "\n";
+    std::cout << "  Cache dir:    " << CACHE_DIR << "\n";
     std::cout << "\n";
     
     // Start timing
@@ -279,11 +462,17 @@ int main(int argc, char* argv[]) {
         }
         
         // ====================================================================
-        // Step 3: Prepare voice conditionals from reference audio
+        // Handle --precache mode
         // ====================================================================
-        std::cout << "Preparing voice conditionals from: " << config.voicePath << "\n";
+        if (config.precache) {
+            return RunPrecache(tts, voiceCache, config.clearCache);
+        }
+        
+        // ====================================================================
+        // Step 3: Prepare voice conditionals (from cache or file)
+        // ====================================================================
         auto prepareConditionalsStartTime = std::chrono::high_resolution_clock::now();
-        if (!tts.PrepareConditionals(config.voicePath)) {
+        if (!ResolveVoice(config.voicePath, tts, voiceCache)) {
             std::cerr << "Error: " << tts.GetLastError() << "\n";
             return 1;
         }
@@ -294,34 +483,23 @@ int main(int argc, char* argv[]) {
         ChatterboxTTS::TokenData tokenData;
         
         if (!config.inputText.empty()) {
-            // Direct text input - use HuggingFace tokenizer
-            std::cout << "Tokenizing text with HuggingFace tokenizer...\n";
+            // Direct text input - use the tokenizer loaded with models
+            std::cout << "Tokenizing text...\n";
             
-            // Find tokenizer.json
-            std::string tokenizerPath = config.modelsDir + "/tokenizer.json";
-            if (!fs::exists(tokenizerPath)) {
-                tokenizerPath = config.modelsDir + "/onnx_" + config.dtype + "/tokenizer.json";
-            }
-            
-            ChatterboxTTS::HFTokenizer hfTokenizer;
-            if (!hfTokenizer.LoadFromFile(tokenizerPath)) {
-                std::cerr << "Error: " << hfTokenizer.GetLastError() << "\n";
+            if (!tts.HasTokenizer()) {
+                std::cerr << "Error: Tokenizer not loaded. Ensure tokenizer.json is in the models directory.\n";
                 return 1;
             }
             
-            // Normalize text (matching Python's punc_norm)
-            std::string normalizedText = ChatterboxTTS::NormalizeTextForTTS(config.inputText);
-            std::cout << "Normalized text: \"" << normalizedText << "\"\n";
+            // Tokenize (normalization is done internally)
+            tokenData = tts.Tokenize(config.inputText);
             
-            // Tokenize
-            tokenData.tokenIds = hfTokenizer.Encode(normalizedText);
-            tokenData.originalText = normalizedText;
-            
-            if (tokenData.tokenIds.empty()) {
-                std::cerr << "Error: Tokenization produced no tokens\n";
+            if (!tokenData.IsValid()) {
+                std::cerr << "Error: " << tts.GetLastError() << "\n";
                 return 1;
             }
             
+            std::cout << "Normalized text: \"" << tokenData.originalText << "\"\n";
             std::cout << "Tokenized to " << tokenData.tokenIds.size() << " tokens\n";
         } else {
             // Load from pre-tokenized file
@@ -348,6 +526,7 @@ int main(int argc, char* argv[]) {
         genConfig.topK = 1000;
         genConfig.topP = 0.95f;
         genConfig.repetitionPenalty = 1.2f;
+        genConfig.seed = 42;  // Fixed seed for reproducible generation
       
         audio = tts.Generate(tokenData, genConfig, nullptr);
         

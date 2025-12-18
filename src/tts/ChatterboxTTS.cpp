@@ -230,6 +230,40 @@ bool ChatterboxTTS::LoadModels(const std::string& modelDir,
         }
     }
     
+    // Load tokenizer.json (shared across all model variants)
+    // Try multiple patterns to find tokenizer.json
+    fs::path tokenizerPath;
+    
+    // Pattern 1: In parent of onnx folder (e.g., models/tokenizer.json)
+    fs::path pattern1Tok = onnxDir.parent_path() / "tokenizer.json";
+    // Pattern 2: In onnx folder itself
+    fs::path pattern2Tok = onnxDir / "tokenizer.json";
+    // Pattern 3: In models dir directly
+    fs::path pattern3Tok = fs::path(modelDir) / "tokenizer.json";
+    
+    if (fs::exists(pattern1Tok)) {
+        tokenizerPath = pattern1Tok;
+    } else if (fs::exists(pattern2Tok)) {
+        tokenizerPath = pattern2Tok;
+    } else if (fs::exists(pattern3Tok)) {
+        tokenizerPath = pattern3Tok;
+    }
+    
+    if (!tokenizerPath.empty() && fs::exists(tokenizerPath)) {
+        m_tokenizer = std::make_unique<HFTokenizer>();
+        if (!m_tokenizer->LoadFromFile(tokenizerPath.string())) {
+            spdlog::warn("Failed to load tokenizer from {}: {}", 
+                        tokenizerPath.string(), m_tokenizer->GetLastError());
+            m_tokenizer.reset();  // Clear the failed tokenizer
+        } else {
+            spdlog::info("Loaded tokenizer from: {}", tokenizerPath.string());
+        }
+    } else {
+        spdlog::warn("tokenizer.json not found. Tried:\n  {}\n  {}\n  {}",
+                    pattern1Tok.string(), pattern2Tok.string(), pattern3Tok.string());
+        spdlog::warn("Direct text input will not be available (use pre-tokenized files instead)");
+    }
+    
     m_modelsLoaded = true;
     m_dtype = dtype;  // Store dtype for fp16 handling
     spdlog::info("All ONNX models loaded successfully");
@@ -243,6 +277,54 @@ bool ChatterboxTTS::IsReady() const {
            m_sessionManager->IsModelLoaded(EMBED_TOKENS) &&
            m_sessionManager->IsModelLoaded(LANGUAGE_MODEL) &&
            m_sessionManager->IsModelLoaded(COND_DECODER);
+}
+
+void ChatterboxTTS::UnloadModels() {
+    spdlog::info("Unloading all models and resources");
+    
+    // Unload tokenizer
+    m_tokenizer.reset();
+    
+    // Recreate session manager (which releases all ONNX sessions)
+    m_sessionManager = std::make_unique<OnnxSessionManager>(ExecutionProvider::CPU);
+    
+    // Clear voice conditionals
+    m_conds = VoiceConditionals();
+    
+    // Reset state
+    m_modelsLoaded = false;
+    m_dtype.clear();
+    m_lastError.clear();
+    
+    spdlog::info("All models and resources unloaded");
+}
+
+bool ChatterboxTTS::HasTokenizer() const {
+    return m_tokenizer && m_tokenizer->IsLoaded();
+}
+
+TokenData ChatterboxTTS::Tokenize(const std::string& text) {
+    TokenData result;
+    
+    if (!HasTokenizer()) {
+        m_lastError = "Tokenizer not loaded";
+        spdlog::error("{}", m_lastError);
+        return result;
+    }
+    
+    // Normalize text (matching Python's punc_norm)
+    std::string normalizedText = NormalizeTextForTTS(text);
+    
+    // Tokenize
+    result.tokenIds = m_tokenizer->Encode(normalizedText);
+    result.originalText = normalizedText;
+    
+    if (result.tokenIds.empty()) {
+        m_lastError = "Tokenization produced no tokens";
+        spdlog::error("{}", m_lastError);
+    }
+    
+    return result;
 }
 
 bool ChatterboxTTS::PrepareConditionals(const std::string& audioPath) {

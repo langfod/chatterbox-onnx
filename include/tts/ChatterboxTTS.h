@@ -111,9 +111,29 @@ public:
                     bool enableProfiling = false);
     
     /**
+     * @brief Unload all models and tokenizer from memory
+     * 
+     * Releases all ONNX sessions, tokenizer, and voice conditionals.
+     * After calling this, IsReady() will return false.
+     */
+    void UnloadModels();
+    
+    /**
      * @brief Check if models are loaded and ready
      */
     bool IsReady() const;
+    
+    /**
+     * @brief Check if tokenizer is loaded
+     */
+    bool HasTokenizer() const;
+    
+    /**
+     * @brief Tokenize text using the loaded HuggingFace tokenizer
+     * @param text Input text (will be normalized automatically)
+     * @return TokenData with token IDs, or empty TokenData on failure
+     */
+    TokenData Tokenize(const std::string& text);
     
     /**
      * @brief Prepare voice conditionals from reference audio
@@ -196,6 +216,9 @@ private:
     
     // Audio loader for reference audio
     AudioLoader m_audioLoader;
+    
+    // HuggingFace tokenizer for text encoding
+    std::unique_ptr<HFTokenizer> m_tokenizer;
     
     // Random number generator
     std::mt19937 m_rng;

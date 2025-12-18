@@ -69,6 +69,9 @@ set(TTS_SOURCES
     
     # Phase 5: Main TTS
     src/tts/ChatterboxTTS.cpp
+    
+    # Phase 6: Voice Caching
+    src/tts/VoiceConditionalsCache.cpp
 )
 
 add_executable(${PROJECT_NAME} ${TTS_SOURCES})
