@@ -51,8 +51,11 @@ if(MSVC)
     
     # Add flags for PDB generation in Release builds
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
-    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
-    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
+    # /LTCG: Enable link-time code generation (avoids linker restart with /GL objects)
+    # /ignore:4098: Suppress CRT mismatch warning (ONNX Runtime static lib uses /MD metadata)
+    # Note: We don't use /NODEFAULTLIB:MSVCRT as it would break CUDA library compatibility
+    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF /LTCG /ignore:4098")
+    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF /LTCG /ignore:4098")
     
 
 endif()
