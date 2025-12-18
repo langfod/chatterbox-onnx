@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "dependencies": [
+    "icu",
+    {
+      "name": "curl",
+      "features": ["ssl", "websockets", "brotli", "openssl"]
+    },
+    {
+      "name": "ffmpeg",
+      "features": ["avcodec", "avformat", "swresample", "swscale"]
+    },
+    "fmt",
+    {
+      "name": "spdlog",
+      "features": ["wchar"]
+    }
+  ]
+}

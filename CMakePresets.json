@@ -1,0 +1,104 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/install/${presetName}",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "warnings": {
+            "dev": false
+      },
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "cl.exe",
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/build/vcpkg_installed",
+        "VCPKG_INSTALL_OPTIONS": "--no-print-usage",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+
+        "CMAKE_CXX_FLAGS": "/permissive- /Zc:preprocessor /MP /W4 /utf-8",
+        "CMAKE_C_FLAGS_DEBUG": "/DWIN32_LEAN_AND_MEAN /DNOMINMAX /DUNICODE /D_UNICODE",
+        "CMAKE_CXX_FLAGS_DEBUG": "/DWIN32_LEAN_AND_MEAN /DNOMINMAX /DUNICODE /D_UNICODE",
+        "CMAKE_C_FLAGS_RELEASE": "/DWIN32_LEAN_AND_MEAN /DNOMINMAX /DUNICODE /D_UNICODE",
+        "CMAKE_CXX_FLAGS_RELEASE": "/DWIN32_LEAN_AND_MEAN /DNOMINMAX /DUNICODE /D_UNICODE"
+      }
+    },
+    {
+      "name": "base-cpu",
+      "hidden": true,
+      "inherits": ["base"],
+      "cacheVariables": {
+        "ENABLE_CUDA": "OFF"
+      }
+    },
+    {
+      "name": "base-cuda",
+      "hidden": true,
+      "inherits": ["base"],
+      "cacheVariables": {
+        "ENABLE_CUDA": "ON",
+        "PROJECT_CUDA_VERSION": "12.9"
+      }
+    },
+    {
+      "name": "debug",
+      "inherits": ["base-cuda"],
+      "displayName": "Debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "DEPLOY_TO_OUTPUT_FOLDER": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": ["base-cuda"],
+      "displayName": "Release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "DEPLOY_TO_OUTPUT_FOLDER": "ON"
+      }
+    },
+    {
+      "name": "debug-cpu",
+      "inherits": ["base-cpu"],
+      "displayName": "Debug (CPU)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "DEPLOY_TO_OUTPUT_FOLDER": "ON"
+      }
+    },
+    {
+      "name": "release-cpu",
+      "inherits": ["base-cpu"],
+      "displayName": "Release (CPU)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "DEPLOY_TO_OUTPUT_FOLDER": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "debug-cpu",
+      "configurePreset": "debug-cpu"
+    },
+    {
+      "name": "release-cpu",
+      "configurePreset": "release-cpu"
+    }
+  ]
+}

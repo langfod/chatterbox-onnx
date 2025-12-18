@@ -1,0 +1,53 @@
+-- Running vcpkg install
+Detecting compiler hash for triplet x64-windows...
+Compiler found: C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe
+Detecting compiler hash for triplet x64-windows-static...
+Compiler found: C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe
+The following packages are already installed:
+  * brotli:x64-windows-static@1.2.0 -- git+https://github.com/microsoft/vcpkg.git@0fb79bb13588702a9e06057745b4aed95ce5c861
+    curl[brotli,core,non-http,openssl,ssl,sspi,websockets]:x64-windows-static@8.17.0 -- git+https://github.com/microsoft/vcpkg.git@e5ec3165c979aad7e25d907ffb82e7b6ad0f8f92
+    ffmpeg[avcodec,avdevice,avfilter,avformat,core,swresample,swscale]:x64-windows-static@7.1.2#3 -- git+https://github.com/microsoft/vcpkg.git@025013f583e57fa395a5479cc985af33fc52ad28
+    fmt:x64-windows-static@12.1.0 -- git+https://github.com/microsoft/vcpkg.git@936231a2c765082457d348a8781ea9d3610eb331
+  * icu[core,tools]:x64-windows@78.1 -- git+https://github.com/microsoft/vcpkg.git@283be8dda7e30d7082255f38b6f18fb16c5f80c0
+    icu:x64-windows-static@78.1 -- git+https://github.com/microsoft/vcpkg.git@283be8dda7e30d7082255f38b6f18fb16c5f80c0
+  * openssl:x64-windows-static@3.6.0#3 -- git+https://github.com/microsoft/vcpkg.git@21c1dabbf149eaa75b6c8b6ba9c3c6edb4f47ea7
+  * pkgconf:x64-windows@2.5.1#4 -- git+https://github.com/microsoft/vcpkg.git@0e3bcce12697924fae59f8567477d1a4cc2de04f
+    spdlog[core,fmt,wchar]:x64-windows-static@1.16.0#1 -- git+https://github.com/microsoft/vcpkg.git@33853c1dc569252eb1df77164b3357d63fc15cb6
+  * vcpkg-cmake:x64-windows@2024-04-23 -- git+https://github.com/microsoft/vcpkg.git@e74aa1e8f93278a8e71372f1fa08c3df420eb840
+  * vcpkg-cmake-config:x64-windows@2024-05-23 -- git+https://github.com/microsoft/vcpkg.git@97a63e4bc1a17422ffe4eff71da53b4b561a7841
+  * vcpkg-cmake-get-vars:x64-windows@2025-05-29 -- git+https://github.com/microsoft/vcpkg.git@d6510f888dd526c7828f6b973349e7f30be51254
+  * vcpkg-make:x64-windows@2025-10-26 -- git+https://github.com/microsoft/vcpkg.git@f5115f8cfeae1176d98357dcdc29535bfe33b9ad
+  * vcpkg-pkgconfig-get-modules:x64-windows@2024-04-03 -- git+https://github.com/microsoft/vcpkg.git@6845369c8cb7d3c318e8e3ae92fd2b7570a756ca
+  * vcpkg-tool-meson:x64-windows@1.9.0#3 -- git+https://github.com/microsoft/vcpkg.git@165684a9f99a44f025f61276320bbd412026400a
+  * zlib:x64-windows-static@1.3.1 -- git+https://github.com/microsoft/vcpkg.git@3f05e04b9aededb96786a911a16193cdb711f0c9
+All requested installations completed successfully in: 458 us
+-- Running vcpkg install - done
+-- Found FFmpeg libraries directly
+-- VERSION: 0.2.2
+-- Not Found TCMalloc: TCMALLOC_LIB-NOTFOUND
+-- Dynamically linking with Boost
+CMake Error at C:/Program Files/CMake/share/cmake-4.1/Modules/FindPackageHandleStandardArgs.cmake:227 (message):
+  Could NOT find Boost (missing: Boost_INCLUDE_DIR)
+Call Stack (most recent call first):
+  C:/Program Files/CMake/share/cmake-4.1/Modules/FindPackageHandleStandardArgs.cmake:591 (_FPHSA_FAILURE_MESSAGE)
+  C:/Program Files/CMake/share/cmake-4.1/Modules/FindBoost.cmake:2437 (find_package_handle_standard_args)
+  C:/Program Files/Microsoft Visual Studio/2022/Community/VC/vcpkg/scripts/buildsystems/vcpkg.cmake:896 (_find_package)
+  external/msgpack-c_cpp/CMakeLists.txt:82 (FIND_PACKAGE)
+
+
+-- Configuring incomplete, errors occurred!
+You have changed variables that require your cache to be deleted.
+Configure will be re-run and you may have to reset some variables.
+The following variables have changed:
+CMAKE_CXX_COMPILER= cl.exe
+CMAKE_CXX_COMPILER= cl.exe
+CMAKE_CXX_COMPILER= cl.exe
+
+CMake Warning:
+-- Generating done (0.1s)
+  Manually-specified variables were not used by the project:
+
+    CMAKE_TOOLCHAIN_FILE
+
+
+CMake Generate step failed.  Build files cannot be regenerated correctly.
