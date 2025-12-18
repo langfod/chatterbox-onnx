@@ -19,7 +19,9 @@ Notes:
 - ChatterBox Turbo is currently English only (multilingual is coming supposedly)
 - saving/caching of cloned conditionals has not been done (TODO item)
   - TODO items in PROJECT_TTS_ADDON.md
-
+- known tags:
+  - `[clear throat]`, `[sigh]`, `[shush]`, `[cough]`, `[groan]`, `[sniff]`, `[gasp]` ,`[chuckle]`, `[laugh]`
+  
 Some Updates:  
 - onnxruntime higher than v1.22.0 needed to support some features
   - using v1.23.2 (actually 1.24.0 pre)
