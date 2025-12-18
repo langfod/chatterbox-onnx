@@ -15,8 +15,7 @@ Cache conditionals from wav files found in "assets" folder to disk ("cache" fold
 `build\release\bin\chatterbox_tts_demo.exe --precache`
 
 Add some tags:  
- `build\release\bin\chatterbox_tts_demo.exe -m models\onnx -t"[clear throat] Listen up worm! [sniff] ugh! Did you just [groan] soil yourself? [cough] Well, [sigh] I was just going to disembowel you anyway. So, like, [laugh] whatever!"  -v babette
- -o test_q4.wav --dtype q4`  
+ `build\release\bin\chatterbox_tts_demo.exe -m models\onnx -t"[clear throat] Listen up worm! [sniff] ugh! Did you just [groan] soil yourself? [cough] Well, [sigh] I was just going to disembowel you anyway. So, like, [laugh] whatever!"  -v babette -o test_q4.wav --dtype q4`  
 
 Notes:
 - ONNX runtime threads are being set to CPU cores / 4  with a minimum of 2
