@@ -1,10 +1,4 @@
 [submodule "external/tokenizers-cpp"]
 	path = external/tokenizers-cpp
 	url = https://github.com/mlc-ai/tokenizers-cpp
-[submodule "external/sentencepiece"]
-	path = external/sentencepiece
-	url = https://github.com/google/sentencepiece.git
-[submodule "external/msgpack-c_cpp"]
-	path = external/msgpack-c_cpp
-	url = https://github.com/msgpack/msgpack-c
-	branch = cpp_master
+

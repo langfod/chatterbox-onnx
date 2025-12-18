@@ -1,8 +1,7 @@
 
 First time submodule init:  
   `git submodule add https://github.com/mlc-ai/tokenizers-cpp "external/tokenizers-cpp"`  
-  `git submodule add https://github.com/google/sentencepiece.git "external/sentencepiece"`  
-  `git submodule add -b cpp_master https://github.com/msgpack/msgpack-c "external/msgpack-c_cpp"`  
+
 
 Build:  
 `cmake -S . --preset=release`  
@@ -10,6 +9,9 @@ Build:
 
 Run:  
  `build\release\bin\chatterbox_tts_demo.exe -m models\onnx --download -t "Hello, my friend! If you seek knowledge about mighty Talos, you have most certainly come to the right person." -v assets\malebrute.wav -o test_q4.wav --dtype q4`  
+
+Add some tags:  
+ `build\release\bin\chatterbox_tts_demo.exe -m models\onnx -t "[clear throat] Listen up worm! [sniff] Did you just soil yourself? [cough] Well, I was just going to [chuckle] disembowel you anyway. So, like, whatever [laugh]!" -v assets\babette.wav -o test_q4.wav --dtype q4`  
 
 Notes:
 - ONNX runtime threads are being set to CPU cores / 4  with a minimum of 2
@@ -27,13 +29,13 @@ Some Updates:
   - using v1.23.2 (actually 1.24.0 pre)
  ---
 Sources:  
-ChatteBox:
+ChatterBox:
  - https://github.com/resemble-ai/chatterbox
  - https://huggingface.co/ResembleAI/chatterbox-turbo-ONNX/tree/main
 
 tokenizers-cpp:
 - https://github.com/mlc-ai/tokenizers-cpp
-- Overwite the submodules needed by tokenizers-cpp with current versions:
+- Overwite the submodules needed by tokenizers-cpp with current versions from vcpkg:
   - SentencePiece:
     - https://github.com/google/sentencepiece
   - msgpack for C++ (cpp_master branch)
